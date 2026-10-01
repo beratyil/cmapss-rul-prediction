@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "turbofan-rul"
+version = "0.1.0"
+description = "NASA C-MAPSS turbofan remaining useful life prediction"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pandas>=2.1",
+]
+
+[project.optional-dependencies]
+notebook = [
+    "jupyterlab>=4.0",
+    "nbconvert>=7.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

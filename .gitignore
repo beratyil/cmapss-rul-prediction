@@ -1,0 +1,38 @@
+# Local datasets and trained model artifacts; keep directory placeholders.
+/CMAPSSData/
+/data/raw/*
+!/data/raw/.gitkeep
+/data/processed/*
+!/data/processed/.gitkeep
+/models/*
+!/models/.gitkeep
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pkl
+*.pickle
+*.joblib
+
+# Python caches and build output.
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Local Python environments and environment settings.
+.venv/
+venv/
+env/
+.env/
+.env
+.env.*
+!.env.example
+
+# Editor-local settings.
+.vscode/
