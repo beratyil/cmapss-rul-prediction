@@ -12,12 +12,16 @@ dependencies = [
     "matplotlib>=3.8",
     "numpy>=1.26",
     "pandas>=2.1",
+    "scikit-learn>=1.4",
 ]
 
 [project.optional-dependencies]
 notebook = [
     "jupyterlab>=4.0",
     "nbconvert>=7.0",
+]
+dev = [
+    "pytest>=8.0",
 ]
 
 [tool.setuptools.packages.find]
