@@ -1,6 +1,6 @@
 import pandas as pd
 
-from turbofan_rul.targets import add_linear_rul
+from turbofan_rul.targets import add_linear_rul, piecewise_rul
 
 
 def test_linear_rul_counts_down_to_zero_per_engine():
@@ -25,3 +25,11 @@ def test_linear_rul_leaves_input_unchanged():
     add_linear_rul(frame)
 
     assert "rul" not in frame.columns
+
+
+def test_piecewise_rul_caps_only_values_above_the_cap():
+    rul = pd.Series([200, 125, 124, 0])
+
+    result = piecewise_rul(rul, cap=125)
+
+    assert result.tolist() == [125, 125, 124, 0]

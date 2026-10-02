@@ -1,5 +1,6 @@
 """Remaining Useful Life (RUL) targets for run-to-failure trajectories."""
 
+import numpy as np
 import pandas as pd
 
 
@@ -11,3 +12,11 @@ def add_linear_rul(frame: pd.DataFrame) -> pd.DataFrame:
     """
     last_cycle = frame.groupby("unit_id")["cycle"].transform("max")
     return frame.assign(rul=last_cycle - frame["cycle"])
+
+
+def piecewise_rul(rul, cap: float):
+    """Piecewise-linear target: `cap` while the engine still looks healthy, true RUL below it.
+
+    Assumes degradation becomes visible roughly `cap` cycles before failure in every engine.
+    """
+    return np.minimum(rul, cap)
