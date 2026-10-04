@@ -12,14 +12,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.preprocessing import StandardScaler
 
 from turbofan_rul.data import load_fd001
-from turbofan_rul.metrics import mae, nasa_score, rmse
 from turbofan_rul.models import LSTMRegressor
-from turbofan_rul.preprocessing import FEATURE_COLUMNS, split_engines
-from turbofan_rul.sequences import make_sequences
-from turbofan_rul.targets import add_linear_rul, piecewise_rul
+from turbofan_rul.pipeline import evaluate_on_test, prepare_sequence_splits, validation_scorer
+from turbofan_rul.preprocessing import FEATURE_COLUMNS
+from turbofan_rul.targets import piecewise_rul
 from turbofan_rul.training import fit, predict, set_seed
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,43 +37,13 @@ GRID, AXIS, SURFACE = "#e1e0d9", "#c3c2b7", "#fcfcfb"
 BLUE, ORANGE = "#2a78d6", "#eb6834"
 
 
-def prepare(data, seq_len: int) -> dict:
-    """Engine split -> scaler fit on training engines -> windows for every split."""
-    train, val = split_engines(add_linear_rul(data.train), val_fraction=0.2, seed=42)
-    test = data.test.copy()
-    scaler = StandardScaler().fit(train[FEATURE_COLUMNS])
-    for frame in (train, val, test):
-        frame[FEATURE_COLUMNS] = scaler.transform(frame[FEATURE_COLUMNS])
-
-    x_train, train_ends = make_sequences(train, FEATURE_COLUMNS, seq_len)
-    x_val, val_ends = make_sequences(val, FEATURE_COLUMNS, seq_len)
-    x_test, test_ends = make_sequences(test, FEATURE_COLUMNS, seq_len, last_only=True)
-    test_ends = test_ends.merge(data.test_rul, on="unit_id")
-    y_train = piecewise_rul(train_ends["rul"].to_numpy(), RUL_CAP) / RUL_CAP
-    return {"x_train": x_train, "y_train": y_train.astype(np.float32),
-            "x_val": x_val, "val_ends": val_ends, "x_test": x_test, "test_ends": test_ends}
-
-
 def train_one(prepared: dict, seed: int, device: torch.device):
     set_seed(seed)
-    y_val = prepared["val_ends"]["rul"].to_numpy()
-    test_like = y_val <= TEST_LIKE_MAX_RUL
-
-    def val_score(model) -> float:
-        pred = predict(model, prepared["x_val"], device) * RUL_CAP
-        return rmse(y_val[test_like], pred[test_like])
-
+    val_score = validation_scorer(prepared, device, RUL_CAP, TEST_LIKE_MAX_RUL)
     model = LSTMRegressor(n_features=len(FEATURE_COLUMNS), hidden_size=HIDDEN_SIZE).to(device)
     history = fit(model, prepared["x_train"], prepared["y_train"], val_score, device,
                   target_scale=RUL_CAP, **TRAINING)
     return model, history
-
-
-def test_metrics(model, prepared: dict, device: torch.device) -> dict:
-    y_test = prepared["test_ends"]["rul_at_last_observation"].to_numpy()
-    pred = predict(model, prepared["x_test"], device) * RUL_CAP
-    return {"test RMSE": rmse(y_test, pred), "test MAE": mae(y_test, pred),
-            "NASA score": nasa_score(y_test, pred), "late predictions": int((pred > y_test).sum())}
 
 
 def style_axes(ax: plt.Axes) -> None:
@@ -153,7 +121,7 @@ def main() -> None:
     # Step 1: choose the sequence length on validation engines (seed 0).
     prepared, runs, rows = {}, {}, []
     for seq_len in SEQ_LENS:
-        prepared[seq_len] = prepare(data, seq_len)
+        prepared[seq_len] = prepare_sequence_splits(data, seq_len, RUL_CAP)
         model, history = train_one(prepared[seq_len], SEEDS[0], device)
         runs[(seq_len, SEEDS[0])] = (model, history)
         n_params = sum(p.numel() for p in model.parameters())
@@ -173,7 +141,7 @@ def main() -> None:
         model, history = runs[(best_len, seed)]
         results.append({"seed": seed, "best epoch": history.best_epoch,
                         "val RMSE": min(history.val_rmse),
-                        **test_metrics(model, prepared[best_len], device)})
+                        **evaluate_on_test(model, prepared[best_len], device, RUL_CAP)})
     results = pd.DataFrame(results)
     print()
     print(results.round(2).to_string(index=False))
